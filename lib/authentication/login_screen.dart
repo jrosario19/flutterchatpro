@@ -1,4 +1,5 @@
 import 'package:country_picker/country_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:flutter/src/widgets/placeholder.dart';
@@ -6,6 +7,9 @@ import 'package:flutter_chat_pro/utilities/assets_manager.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:rounded_loading_button/rounded_loading_button.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/authentication_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,9 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
   TextEditingController _phoneNumberController =
       TextEditingController(text: '');
 
-      String phoneNumber = '';
-  final RoundedLoadingButtonController btnController =
-      RoundedLoadingButtonController();
+  String phoneNumber = '';
+  
 
   Country selectedCountry = Country(
       phoneCode: '1',
@@ -37,12 +40,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _phoneNumberController.dispose();
-    btnController.stop();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final _authProvider = context.watch<AuthenticationProvider>();
     return Scaffold(
         body: SingleChildScrollView(
       child: Center(
@@ -79,9 +82,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 onChanged: (String value) {
-                 setState(() {
-                   phoneNumber=value;
-                 });
+                  setState(() {
+                    phoneNumber = value;
+                  });
                 },
                 decoration: InputDecoration(
                     counterText: '',
@@ -89,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintStyle: GoogleFonts.openSans(
                         fontSize: 16, fontWeight: FontWeight.w500),
                     prefixIcon: Container(
-                      padding: EdgeInsets.all(10),
+                      padding: EdgeInsets.fromLTRB(8.0, 12.0, 8.0, 12.0),
                       child: InkWell(
                         onTap: () {
                           showCountryPicker(
@@ -109,18 +112,33 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     suffixIcon: phoneNumber.length > 9
-                        ? Container(
-                            height: 20,
-                            width: 20,
-                            margin: const EdgeInsets.all(10),
-                            decoration: const BoxDecoration(
-                                color: Colors.green, shape: BoxShape.circle),
-                            child: const Icon(
-                              Icons.done,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          )
+                        ? _authProvider.isLoading
+                            ? Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: CircularProgressIndicator(),
+                            )
+                            : InkWell(
+                                onTap: () {
+                                  //sign in with phone number
+                                  _authProvider.signInWithPhoneNumber(
+                                      phoneNumber:
+                                          '+${selectedCountry.phoneCode}${phoneNumber}',
+                                      context: context);
+                                },
+                                child: Container(
+                                  height: 35,
+                                  width: 35,
+                                  margin: const EdgeInsets.all(10),
+                                  decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle),
+                                  child: const Icon(
+                                    Icons.done,
+                                    color: Colors.white,
+                                    size: 25,
+                                  ),
+                                ),
+                              )
                         : SizedBox.shrink(),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10))),
