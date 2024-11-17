@@ -1,5 +1,9 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../constants.dart';
+import '../providers/authentication_provider.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -32,7 +36,34 @@ bool isDarkTheme = false;
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.read<AuthenticationProvider>().userModel!;
+    //get uid from arguments
+    final uid = ModalRoute.of(context)!.settings.arguments as String;
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Settings'),
+        centerTitle: true,
+        actions: [
+          currentUser.uid==uid?
+          IconButton(
+            onPressed: () async{
+              showDialog(context: context, builder: (context)=>AlertDialog(
+                title: Text('Are you sure you want to logout?'),
+                actions: [
+                  TextButton(onPressed: (){
+                    Navigator.pop(context);
+                  }, child: Text('Cancel')),
+                  TextButton(onPressed: ()async{
+                    await context.read<AuthenticationProvider>().logout().whenComplete(() {
+                      Navigator.pushReplacementNamed(context, Constants.loginScreen);
+                    });
+                  }, child: Text('Logout'))
+                ],
+              ));
+            },
+            icon: Icon(Icons.logout),
+          ):SizedBox.shrink()
+        ],),
       body: Center(
         child: Card(
             child: SwitchListTile(

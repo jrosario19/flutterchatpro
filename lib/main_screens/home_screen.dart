@@ -5,9 +5,13 @@ import 'package:flutter/src/widgets/framework.dart';
 import 'package:flutter/src/widgets/placeholder.dart';
 import 'package:flutter_chat_pro/main_screens/groups_screen.dart';
 import 'package:flutter_chat_pro/main_screens/people_screen.dart';
+import 'package:flutter_chat_pro/providers/authentication_provider.dart';
+import 'package:flutter_chat_pro/utilities/global_methods.dart';
+import 'package:provider/provider.dart';
 
+import '../constants.dart';
 import '../utilities/assets_manager.dart';
-import 'chat_list_screen.dart';
+import 'my_chats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,27 +20,64 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   int currentIndex = 0;
   final PageController pageController = PageController(initialPage: 0);
   final List<Widget> pages = [
-    ChatsListScreen(),
+    MyChatsScreen(),
     GroupsScreen(),
     PeopleScreen(),
   ];
+
+  @override
+  void initState() {
+    WidgetsBinding.instance.addObserver(this);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        context.read<AuthenticationProvider>().updateUserStatus(isOnline: true);
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        context
+            .read<AuthenticationProvider>()
+            .updateUserStatus(isOnline: false);
+        break;
+    }
+    super.didChangeAppLifecycleState(state);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthenticationProvider>();
     return Scaffold(
         appBar: AppBar(
           title: Text('Flutter Chat Pro'),
           actions: [
             Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: CircleAvatar(
-                radius: 20,
-                backgroundImage: AssetImage(AssetsManager.userImage),
-              ),
-            )
+                padding: const EdgeInsets.all(8.0),
+                child: userImageWidget(
+                    imageUrl: authProvider.userModel!.image,
+                    radiis: 20,
+                    onTap: () {
+                      //navigate to profile screen with uid as argument
+                      Navigator.pushNamed(
+                        context,
+                        Constants.profileScreen,
+                        arguments: authProvider.userModel!.uid,
+                      );
+                    }))
           ],
         ),
         body: PageView(

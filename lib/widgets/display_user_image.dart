@@ -27,7 +27,7 @@ class DisplayUserImage extends StatelessWidget {
                     onTap: onPressed,
                     child: CircleAvatar(
                       radius: 20,
-                      backgroundColor: Colors.green,
+                      backgroundColor: Theme.of(context).primaryColor,
                       child: Icon(
                         Icons.camera_alt,
                         color: Colors.white,

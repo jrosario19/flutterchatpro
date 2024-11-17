@@ -82,3 +82,33 @@ class Constants {
 
   static const String groupImages = 'groupImages';
 }
+
+enum FriendViewType {
+  friends,
+  friendRequests,
+  groupsView,
+}
+
+enum MessageEnum{
+text,
+image,
+video,
+audio,
+}
+
+extension MessageEnumExtension on String{
+  MessageEnum toMessageEnum(){
+    switch(this){
+      case 'text':
+        return MessageEnum.text;
+      case 'image':
+        return MessageEnum.image;
+      case 'video':
+        return MessageEnum.video;
+      case 'audio':
+        return MessageEnum.audio;
+      default:
+        return MessageEnum.text;
+    }
+  }
+}

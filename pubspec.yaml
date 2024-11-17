@@ -49,6 +49,11 @@ dependencies:
   image_cropper: ^3.0.0
   image_picker: ^1.0.4
   uuid: ^3.0.0
+  date_format: ^2.0.9
+  grouped_list: ^6.0.0
+  swipe_to: ^1.0.5
+  timeago: ^3.6.0
+  cached_network_image: ^3.0.0
 
 dev_dependencies:
   flutter_test:

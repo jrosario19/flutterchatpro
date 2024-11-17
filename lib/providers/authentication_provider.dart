@@ -28,6 +28,23 @@ class AuthenticationProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _firebaseStorage = FirebaseStorage.instance;
 
+  //check authentication state
+  Future<bool> checkAuthenticationState() async {
+    bool isSignedIn = false;
+    await Future.delayed(const Duration(seconds: 2));
+    if (_auth.currentUser != null) {
+      _uid = _auth.currentUser!.uid;
+
+      await getUserDataFromFireStore();
+      await saveUserDataToShredPreferences();
+      notifyListeners();
+      isSignedIn = true;
+    } else {
+      isSignedIn = false;
+    }
+    return isSignedIn;
+  }
+
   //check if user exxists
   Future<bool> checkIfUserExists() async {
     DocumentSnapshot documentSnapshot =
@@ -37,6 +54,14 @@ class AuthenticationProvider extends ChangeNotifier {
     } else {
       return false;
     }
+  }
+
+  //set user online status
+  Future<void> updateUserStatus({required bool isOnline}) async {
+    await _firestore
+        .collection(Constants.users)
+        .doc(_auth.currentUser!.uid)
+        .update({Constants.isOnline: isOnline}); 
   }
 
   //get user data from firestore
@@ -144,17 +169,19 @@ class AuthenticationProvider extends ChangeNotifier {
         userModel.image = imageUrl;
       }
 
-     userModel.lastSeen = DateTime.now().microsecondsSinceEpoch.toString();
-     userModel.createdAt = DateTime.now().microsecondsSinceEpoch.toString();
+      userModel.lastSeen = DateTime.now().microsecondsSinceEpoch.toString();
+      userModel.createdAt = DateTime.now().microsecondsSinceEpoch.toString();
 
-     _userModel = userModel;
-     _uid = userModel.uid;
+      _userModel = userModel;
+      _uid = userModel.uid;
 
-     await _firestore.collection(Constants.users).doc(userModel.uid).set(userModel.toMap());
-     _isLoading = false;
-     onSucess();
-     notifyListeners();
-
+      await _firestore
+          .collection(Constants.users)
+          .doc(userModel.uid)
+          .set(userModel.toMap());
+      _isLoading = false;
+      onSucess();
+      notifyListeners();
     } on FirebaseException catch (e) {
       _isLoading = false;
       notifyListeners();
@@ -170,5 +197,121 @@ class AuthenticationProvider extends ChangeNotifier {
     TaskSnapshot snapshot = await uploadTask;
     String downloadUrl = await snapshot.ref.getDownloadURL();
     return downloadUrl;
+  }
+
+  //get user stream from firestore
+  Stream<DocumentSnapshot> userStream({required String userId}) {
+    return _firestore.collection(Constants.users).doc(userId).snapshots();
+  }
+
+  //get all users stream from firestore
+  Stream<QuerySnapshot> getAllUsersStream({required String userId}) {
+    return _firestore
+        .collection(Constants.users)
+        .where(Constants.uid, isNotEqualTo: userId)
+        .snapshots();
+  }
+
+  //send a friend request
+  Future<void> sendFriendRequest({required String friendId}) async {
+    try {
+      await _firestore.collection(Constants.users).doc(friendId).update({
+        Constants.friendRequestsUIDs: FieldValue.arrayUnion([_uid])
+      });
+      //add friend uid to our friend requests sent list
+      await _firestore.collection(Constants.users).doc(_uid).update({
+        Constants.sentFriendRequestsUIDs: FieldValue.arrayUnion([friendId])
+      });
+    } on FirebaseException catch (e) {
+      print(e.toString());
+    }
+  }
+
+  Future<void> cancelFriendRequest({required String friendId}) async {
+    try {
+      _firestore.collection(Constants.users).doc(friendId).update({
+        Constants.friendRequestsUIDs: FieldValue.arrayRemove([_uid])
+      });
+      _firestore.collection(Constants.users).doc(_uid).update({
+        Constants.sentFriendRequestsUIDs: FieldValue.arrayRemove([friendId])
+      });
+    } on FirebaseException catch (e) {
+      print(e.toString());
+    }
+  }
+
+  Future<void> acceptFriendRequest({required String friendId}) async {
+    try {
+      await _firestore.collection(Constants.users).doc(friendId).update({
+        Constants.friendsUIDs: FieldValue.arrayUnion([_uid])
+      });
+      await _firestore.collection(Constants.users).doc(_uid).update({
+        Constants.friendsUIDs: FieldValue.arrayUnion([friendId])
+      });
+      await _firestore.collection(Constants.users).doc(friendId).update({
+        Constants.sentFriendRequestsUIDs: FieldValue.arrayRemove([_uid])
+      });
+      await _firestore.collection(Constants.users).doc(_uid).update({
+        Constants.friendRequestsUIDs: FieldValue.arrayRemove([friendId])
+      });
+    } on FirebaseException catch (e) {
+      print(e.toString());
+    }
+  }
+
+  Future<void> removeFriend({required String friendId}) async {
+    try {
+      await _firestore.collection(Constants.users).doc(friendId).update({
+        Constants.friendsUIDs: FieldValue.arrayRemove([_uid])
+      });
+      await _firestore.collection(Constants.users).doc(_uid).update({
+        Constants.friendsUIDs: FieldValue.arrayRemove([friendId])
+      });
+    } on FirebaseException catch (e) {
+      print(e.toString());
+    }
+  }
+
+  //get a list of friends
+  Future<List<UserModel>> getFriendsList(String uid) async {
+    List<UserModel> friendsList = [];
+
+    DocumentSnapshot documentSnapshot =
+        await _firestore.collection(Constants.users).doc(uid).get();
+    List<dynamic> friendsUIDs = documentSnapshot.get(Constants.friendsUIDs);
+
+    for (String friendId in friendsUIDs) {
+      DocumentSnapshot documentSnapshot =
+          await _firestore.collection(Constants.users).doc(friendId).get();
+      UserModel userModel =
+          UserModel.fromMap(documentSnapshot.data() as Map<String, dynamic>);
+      friendsList.add(userModel);
+    }
+    return friendsList;
+  }
+
+  //get a list of friend requests
+  Future<List<UserModel>> getFriendRequestsList(String uid) async {
+    List<UserModel> friendRequestsList = [];
+
+    DocumentSnapshot documentSnapshot =
+        await _firestore.collection(Constants.users).doc(uid).get();
+    List<dynamic> friendRequestsUIDs =
+        documentSnapshot.get(Constants.friendRequestsUIDs);
+    for (String friendId in friendRequestsUIDs) {
+      DocumentSnapshot documentSnapshot =
+          await _firestore.collection(Constants.users).doc(friendId).get();
+      UserModel userModel =
+          UserModel.fromMap(documentSnapshot.data() as Map<String, dynamic>);
+      friendRequestsList.add(userModel);
+    }
+    return friendRequestsList;
+  }
+
+  logout() async {
+    await _auth.signOut();
+    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+    await sharedPreferences.clear();
+    notifyListeners();
   }
 }
